@@ -26,14 +26,13 @@ function sendRedirect (c)
 end
 
 function sendHead (c) 
-    c:send([xx[<html>
-<head><title>Continuous Integration Light v0.1</title></head>
-<body>
-]xx])
+    c:send("<html>"
+        .. "<head><title>Continuous Integration Light v0.1</title></head>"
+        .. "<body>")
 end
 
 function sendFooter (c)
-    c:send([xx[</body></html>]xx])
+    c:send("</body></html>")
 end
 
 function sendIndexBody (c)
@@ -72,13 +71,13 @@ function servePage (c, method, url)
     if method == "GET" then
         if url == "/" then
             serveIndex(c)
-        else if url:startsWith('/light/') then
+        elseif url:startsWith('/light/') then
             handleLight(c, method)
         end
     end
 end
 
-srv = net.createServer(new.TCP, 30)
+srv = net.createServer(net.TCP, 30)
 srv:listen(80, function(c)
     local data = ""
     c:on("receive", function (c,pl)
@@ -94,4 +93,3 @@ srv:listen(80, function(c)
         end
     end)
 end)
-

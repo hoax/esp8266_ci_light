@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="de">
+	<head>
+		<title>Continuous Integration Light v0.1</title>
+		<script src="jquery-2.2.0.min.js"></script>
+		<style>
+		table { 
+			width: 95%; 
+			margin-left: auto; 
+			margin-right: auto; 
+			table-layout: fixed; 
+		}
+		input { width: 100%; }
+		td:first-child { width: 100px; }
+		td:nth-child(2) { width: 100%; }
+		</style>
+	</head>
+	<body>
+		<table>
+			<tr>
+				<td>Host/IP:</td>
+				<td><input type="text" name="host" value="192.168.55.51"/></td>
+			</tr>
+			<tr>
+				<td>rot</td>
+				<td><input type="range" name="red" min="0" max="1023"/></td>
+			</tr>
+			<tr>
+				<td>gelb</td>
+				<td><input type="range" name="yellow" min="0" max="1023"/></td>
+			</tr>
+			<tr>
+				<td>gruen</td>
+				<td><input type="range" name="green" min="0" max="1023"/></td>
+			</tr>
+		</table>
+		<script>
+			var sendColor = function (evt) {
+				var host = $('input[name=host]').val()
+				var color = $(this).attr("name")
+				var value = $(this).val()
+				var oldValue = $(this).data('oldVal')
+				
+				if (value != oldValue) {
+					$.ajax("http://" + host + "/light/" + color + "/" + value)
+				}
+				
+				$(this).data('oldVal',  value);
+				
+			}
+			
+			var updateRangeValues = function (evt) {
+				var host = $(this).val()
+				$.getJSON("http://" + host + "/light/status", function (data) {
+					$.each(data, function (k,v) {
+						$('input[name='+k+']').val(v)
+					})
+				})
+				
+			}
+		
+			$(document).ready(function() {
+				$('input[type=range]').on('change', sendColor)
+				$('input[type=range]').on('keyup', sendColor)
+				$('input[name=host]').on('focusout', updateRangeValues)
+				$('input[name=host]').focus()
+			});
+		</script>
+	</body>
+</html>
+

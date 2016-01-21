@@ -1,31 +1,35 @@
-function string.startsWith(String,Start)
-   return string.sub(String,1,string.len(Start))==Start
+function sendNotFound (c) 
+    c:send("HTTP/1.0 404 Not found\r\n"
+        .. "Connection: close\r\n\r\n"
+        .. "NOT FOUND!")
+end
+
+function closeConnection (c)
+    c:close()
 end
 
 function sendParts (c, parts)
     local function sender (sck)
         if #parts>0 then 
-            table.remove(parts,1)(sck)
+            local part = table.remove(parts,1)
+            part(sck)
         else 
             sck:close()
         end
     end
+    c:on('sent', sender)
     sender(c)
 end
 
 function sendHeaders (c)
     c:send("HTTP/1.0 200 OK\r\n"
-        .. "Server: nodemcu-httpserver\r\n"
+        --.. "Server: nodemcu-httpserver\r\n"
+        .. "Access-Control-Allow-Origin: *\r\n"
         .. "Content-Type: text/html\r\n" 
         .. "Connection: close\r\n\r\n")
 end
 
-function sendRedirect (c) 
-    c:send("HTTP/1.0 302 Found\r\n"
-        .. "Connection: close\r\n\r\n")
-end
-
-function sendHead (c) 
+function sendHead (c)
     c:send("<html>"
         .. "<head><title>Continuous Integration Light v0.1</title></head>"
         .. "<body>")
@@ -36,60 +40,101 @@ function sendFooter (c)
 end
 
 function sendIndexBody (c)
-    c:send("Verwenden Sie die URL <em>/light/$color/$brightness</em> um die einzelnen Lampen zu steuern.<br>"
-        .. "$color steht hierbei für <em>red</emd>,<em>yellow</em> oder <em>green</em> und $brightness ist eine "
+    c:send("Verwenden Sie die URL <em>/light/$color/$brightness</em> um die einzelnen Farben zu steuern.<br>"
+        .. "$color steht hierbei f&uuml;r <em>red</emd>,<em>yellow</em> oder <em>green</em> und $brightness ist eine "
         .. "Ganzzahl von 0 (= aus) bis 1023 (= 100% an).<br>"
         .. "Aktueller Zustand: <ul>"
         .. "<li>Rot: " .. pwm.getduty(LEDS.red)
         .. "<li>Gelb: " .. pwm.getduty(LEDS.yellow)
-        .. "<li>Grün: " .. pwm.getduty(LEDS.green)
+        .. "<li>Gr&uuml;n: " .. pwm.getduty(LEDS.green)
         .. "</ul>")
 end
 
+function sendStatus (c)
+    c:send('{ "red":' .. pwm.getduty(LEDS.red)
+        .. ', "yellow":' .. pwm.getduty(LEDS.yellow)
+        .. ', "green":' .. pwm.getduty(LEDS.green)
+        .. '}')
+end
+
 function serveIndex (c)
-    local parts = { sendHeaders, sendHead, sendIndexBody, sendFooter } 
+    local parts = { sendHeaders, sendHead, sendIndexBody, sendFooter, closeConnection } 
     sendParts(c, parts)
 end
 
-function handleLight (c, method)
-    local _, _, color, value = method:find(".*/(.-)/(.-)$")
-    value = tonumber(value)
-    if not value or value < 0 then
-        value = 0
-    elseif value > 1023 then
-        value = 1023
+function serveStatus (c)
+    local parts = { sendHeaders, sendStatus, closeConnection }
+    sendParts(c, parts)
+end
+
+function serveNotFound (c)
+    local parts = { sendNotFound, closeConnection }
+    sendParts(c, parts)
+end
+
+function handleLight (c, url)
+    local _, _, color, value = url:find(".*/(.-)/(.-)$")
+    if color and value then
+        value = tonumber(value)
+        if not value or value < 0 then
+            value = 0
+        elseif value > 1023 then
+            value = 1023
+        end
+        local led = LEDS[color]
+        if led then
+            pwm.setduty(led, value)
+        end
     end
-    local led = LEDS[color]
-    if led then
-        pwm.setduty(led, value)
-    end
-    
-    sendRedirect(c, "/")
+    serveStatus(c)
 end
 
 function servePage (c, method, url)
-    if method == "GET" then
+    if method == "GET" and url then
         if url == "/" then
             serveIndex(c)
-        elseif url:startsWith('/light/') then
-            handleLight(c, method)
+        elseif url == "/light/status" then
+            serveStatus(c)
+        elseif url:find('^/light/') then
+            handleLight(c, url)
+        else
+            serveNotFound(c)
         end
+    else
+        serveNotFound(c)
     end
 end
 
-srv = net.createServer(net.TCP, 30)
+if srv then
+    srv:close()
+end
+srv = net.createServer(net.TCP, 60)
 srv:listen(80, function(c)
-    local data = ""
+    local firstLine = ""
+    local lastFewBytes = ""
+    local getFirstLine = true
     c:on("receive", function (c,pl)
-        if #data + #pl > 60 then
-            c:close()
-            return
+        if getFirstLine then
+            local _, posEnd = pl:find("\n")
+            if posEnd then
+                firstLine = firstLine .. pl:sub(1, posEnd)
+                getFirstLine = false
+            else
+                firstLine = firstLine .. pl
+            end
         end
 
-        data = data + pl
-        if data:find("\n") then
-            local _, _, method, url = data:find("^([A-Z]+) (.-) HTTP/[1-9]+.[0-9]+\r\n$")
-            servePage(c, method, url)
+            --[[
+            --]]
+        if not getFirstLine then
+            lastFewBytes = lastFewBytes .. pl
+            local _, headerEnd = lastFewBytes:find("\r\n\r\n")
+            if headerEnd then
+                local _, _, method, url = firstLine:find("^([A-Z]+) (.-) HTTP/[1-9]+.[0-9]+\r\n$")
+                servePage(c, method, url)
+            else
+                lastFewBytes = lastFewBytes:sub(-3, -1)
+            end
         end
     end)
 end)

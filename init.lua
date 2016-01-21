@@ -16,6 +16,11 @@ for index,led in pairs(LEDS) do
     pwm.setup(led, 200, 0)
 end
 
+function showStationConfig ()
+    print("wifi: " .. wifi.sta.getconfig())
+    print("ip: " .. wifi.sta.getip())
+end
+
 function leds (red, yellow, green)
     if red >= 0 then
         pwm.setduty(LEDS.red, red)
@@ -28,29 +33,32 @@ function leds (red, yellow, green)
     end
 end
 
-function blinkYellow (redOn, yellowOn, greenOn, redOff, yellowOff, greenOff)
-    local function blinkOn ()
+function blink (redOn, yellowOn, greenOn, redOff, yellowOff, greenOff)
+    local blinkOff
+    local function blinkOn (otherMethod)
         pwm.setduty(LEDS.red, redOn)
         pwm.setduty(LEDS.yellow, yellowOn)
         pwm.setduty(LEDS.green, greenOn)
         tmr.alarm(2, 500, tmr.ALARM_SINGLE, blinkOff)
     end
-    local function blinkOff ()
+    blinkOff = function ()
         pwm.setduty(LEDS.red, redOff)
         pwm.setduty(LEDS.yellow, yellowOff)
         pwm.setduty(LEDS.green, greenOff)
         tmr.alarm(2, 500, tmr.ALARM_SINGLE, blinkOn)
     end
-    yellowOn()
+    blinkOn()
 end
 
 leds(128,128,128)
 tmr.alarm(1, 3000, tmr.ALARM_SINGLE, function () 
+    gpio.mode(BUTTONPIN, gpio.INPUT, gpio.FLOAT)
     leds(0,0,0)
     local fileTable = file.list()
     if fileTable['cilight.lc'] then
+        showStationConfig()
         print("calling cilight.lc ...")
-        pcall(dofile('cilight.lc'))
+        dofile('cilight.lc')
     else
         print("cilight.lc not found!")
     end
@@ -61,6 +69,7 @@ gpio.trig(BUTTONPIN, "down", function ()
     tmr.stop(1)
     tmr.alarm(1, 3000, tmr.ALARM_SINGLE, function()
         -- button pressed for 3 seconds
+        print("main application skipped, you can release the button now, I'm all yours...")
         gpio.mode(BUTTONPIN, gpio.INPUT, gpio.FLOAT)
         leds(0,0,0)
         blink(1023,0,0,0,0,0)
@@ -70,11 +79,10 @@ gpio.trig(BUTTONPIN, "down", function ()
         -- button press shorter than 3 seconds
         leds(512,0,512)
         blink(0,1023,0,0,0,0)
-        pcall(dofile('setup.lc'))
+        dofile('setup.lc')
     end
     tmr.unregister(1)
     gpio.mode(BUTTONPIN, gpio.INPUT, gpio.FLOAT)
     end)
-    print("startup aborted")
+    print("startup aborted, keep holding the button to skip main application")
 end)
-

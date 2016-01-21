@@ -56,7 +56,7 @@ tmr.alarm(1, 3000, tmr.ALARM_SINGLE, function ()
     leds(0,0,0)
     local fileTable = file.list()
     if fileTable['cilight.lc'] then
-        showStationConfig()
+        pcall(showStationConfig)
         print("calling cilight.lc ...")
         dofile('cilight.lc')
     else

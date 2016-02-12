@@ -72,20 +72,151 @@ function serveNotFound (c)
     sendParts(c, parts)
 end
 
-function handleLight (c, url)
-    local _, _, color, value = url:find(".*/(.-)/(.-)$")
-    if color and value then
-        value = tonumber(value)
-        if not value or value < 0 then
-            value = 0
-        elseif value > 1023 then
-            value = 1023
+function processFade (entry)
+    local fade = entry.fade
+    tmr.unregister(LEDS[fade.color]-1)
+    local value = fade.from
+    tmr.alarm(LEDS[fade.color]-1, fade.delay, tmr.ALARM_SEMI, function ()
+        pwm.setduty(LEDS[fade.color], value)
+        local nextValue = value + fade.step
+        if (fade.step > 0 and nextValue > fade.to)
+                or (fade.step < 0 and nextValue < fade.to) then
+            nextValue = fade.to
         end
-        local led = LEDS[color]
-        if led then
-            pwm.setduty(led, value)
+        if (value < fade.to and nextValue <= fade.to) 
+            or (value > fade.to and nextValue >= fade.to) then
+            value = nextValue
+            tmr.start(LEDS[fade.color]-1)
+        else
+            tmr.unregister(LEDS[fade.color]-1)
+            processBlinkQueue()
+        end
+    end)
+end
+
+_blinkQueue = {}
+function processBlinkQueue ()
+    while #_blinkQueue > 0 do
+        local entry = table.remove(_blinkQueue, 1)
+        if entry then
+            if _blinkQueue.doRepeat == true then
+                table.insert(_blinkQueue, entry)
+            end
+    
+            if entry.setColor then
+                local led = LEDS[entry.setColor.color]
+                pwm.setduty(led, entry.setColor.value)
+            end
+            if entry.fade then
+                processFade(entry)
+                break
+            end
+            if entry.delay then
+                tmr.alarm(3, entry.delay, tmr.ALARM_SINGLE, processBlinkQueue)
+                break
+            end
         end
     end
+end
+
+function matchDelay (url)
+    return url:find("^/delay/(%d+)")
+end
+
+function matchRepeat (url)
+    return url:find('^/repeat/')
+end
+
+function matchFade (url)
+    return url:find('^/fade/(%a+)/(%d+)/(%d+)/(%d+)/(%d+)')
+end
+
+function setQueue (newQueue)
+    for i=4,6 do
+        tmr.unregister(i)
+    end
+    tmr.unregister(3)
+    _blinkQueue = newQueue 
+end
+
+function handleLight (c, url)
+    local blinkQueue = {}
+    
+    function enqueue (entry)
+        table.insert(blinkQueue, entry)
+    end
+
+    url = url:sub(7)
+    while #url > 0 do
+        if matchDelay(url) then
+            local _, endIndex, timeStr = matchDelay(url)
+            local time = tonumber(timeStr)
+            if time then
+                url = url:sub(endIndex + 1)
+                enqueue({ delay = tonumber(time) })
+            else
+                serveNotFound(c)
+                return
+            end
+        elseif matchRepeat(url) then
+            url = url:sub(8)
+            blinkQueue.doRepeat = true
+        elseif matchFade(url) then
+            local _, endIndex, color, delayStr, fromStr, toStr, stepStr = matchFade(url)
+            url = url:sub(endIndex+1)
+            local delay = tonumber(delayStr)
+            local from = tonumber(fromStr)
+            local to = tonumber(toStr)
+            local step = tonumber(stepStr)
+            delay = math.min(1023, delay)
+            from = math.min(1023, from)
+            to = math.min(1023, to)
+            step = math.min(1023, step)
+            if to < from then
+                step = step * -1
+            end
+            if LEDS[color] and delay and from and to and step then
+                enqueue({fade={color=color, delay=delay, from=from, to=to, step=step}})
+            end
+        else
+            local _, endIndex, color, value = url:find("^/(%a+)/(%d+)")
+            if color and value and LEDS[color] then
+                url = url:sub(endIndex + 1)
+                value = tonumber(value)
+                if not value or value < 0 then
+                    value = 0
+                elseif value > 1023 then
+                    value = 1023
+                end
+                enqueue({setColor={color=color, value=value}})
+            else
+                serveNotFound(c)
+                return
+            end
+        end
+    end
+
+    setQueue(blinkQueue)
+    processBlinkQueue()
+    serveStatus(c)
+end
+
+function handlePresetBuildFade (c)
+    tmr.unregister(3)
+    local queue = {
+        doRepeat = true,
+        { setColor = { color = "red", value = 0 } },
+        { setColor = { color = "yellow", value = 0 } },
+        { setColor = { color = "green", value = 0 } },
+        { fade = { color = "red", delay = 10, from = 0, to = 1020, step = 10 } },
+        { fade = { color = "red", delay = 10, from = 1020, to = 0, step = -10 } },
+        { fade = { color = "yellow", delay = 10, from = 0, to = 1020, step = 10 } },
+        { fade = { color = "yellow", delay = 10, from = 1020, to = 0, step = -10 } },
+        { fade = { color = "green", delay = 10, from = 0, to = 1020, step = 10 } },
+        { fade = { color = "green", delay = 10, from = 1020, to = 0, step = -10 } },
+    }
+    setQueue(queue)
+    processBlinkQueue()
     serveStatus(c)
 end
 
@@ -95,8 +226,10 @@ function servePage (c, method, url)
             serveIndex(c)
         elseif url == "/light/status" then
             serveStatus(c)
-        elseif url:find('^/light/') then
+        elseif url:find('^/light/') or url:find('^/repeat/') then
             handleLight(c, url)
+        elseif url == "/preset/buildFade" then
+            handlePresetBuildFade(c)
         else
             serveNotFound(c)
         end
@@ -124,8 +257,6 @@ srv:listen(80, function(c)
             end
         end
 
-            --[[
-            --]]
         if not getFirstLine then
             lastFewBytes = lastFewBytes .. pl
             local _, headerEnd = lastFewBytes:find("\r\n\r\n")

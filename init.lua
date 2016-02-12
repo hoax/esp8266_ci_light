@@ -1,4 +1,4 @@
-uart.setup(0, 115200, 8, 0, 1, 1)
+--uart.setup(0, 115200, 8, 0, 1, 1)
 gpio.mode(2, gpio.INT, gpio.PULLUP)
 
 print()
@@ -18,7 +18,7 @@ end
 
 function showStationConfig ()
     print("wifi: " .. wifi.sta.getconfig())
-    print("ip: " .. wifi.sta.getip())
+    print("ip: ", wifi.sta.getip())
 end
 
 function leds (red, yellow, green)
@@ -56,7 +56,9 @@ tmr.alarm(1, 3000, tmr.ALARM_SINGLE, function ()
     leds(0,0,0)
     local fileTable = file.list()
     if fileTable['cilight.lc'] then
-        pcall(showStationConfig)
+        --tmr.alarm(1, 3000, tmr.ALARM_SINGLE, function ()
+            pcall(showStationConfig)
+        --end)
         print("calling cilight.lc ...")
         dofile('cilight.lc')
     else

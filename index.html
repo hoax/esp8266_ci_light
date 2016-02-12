@@ -36,6 +36,13 @@
 			</tr>
 		</table>
 		<script>
+			var updateSlider = function (data) {
+				$.each(data, function (k,v) {
+					$('input[name='+k+']').val(v)
+				})
+	
+			}
+			
 			var sendColor = function (evt) {
 				var host = $('input[name=host]').val()
 				var color = $(this).attr("name")
@@ -43,27 +50,23 @@
 				var oldValue = $(this).data('oldVal')
 				
 				if (value != oldValue) {
-					$.ajax("http://" + host + "/light/" + color + "/" + value)
+					$.getJSON("http://" + host + "/light/" + color + "/" + value, updateSlider)
 				}
 				
 				$(this).data('oldVal',  value);
 				
 			}
 			
-			var updateRangeValues = function (evt) {
+			var fetchCurrentColorSettings = function (evt) {
 				var host = $(this).val()
-				$.getJSON("http://" + host + "/light/status", function (data) {
-					$.each(data, function (k,v) {
-						$('input[name='+k+']').val(v)
-					})
-				})
+				$.getJSON("http://" + host + "/light/status", updateSlider)
 				
 			}
 		
 			$(document).ready(function() {
 				$('input[type=range]').on('change', sendColor)
 				$('input[type=range]').on('keyup', sendColor)
-				$('input[name=host]').on('focusout', updateRangeValues)
+				$('input[name=host]').on('focusout', fetchCurrentColorSettings)
 				$('input[name=host]').focus()
 			});
 		</script>

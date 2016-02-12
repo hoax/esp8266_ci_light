@@ -15,3 +15,10 @@ These are the steps to use this software on an esp8266 module:
 
 If you don't have a local lua installation you can simply upload cilight.lua and setup.lua and compile them on the module
 itself by calling `node.compile(...)` for both files.
+
+## Configuration
+
+To configure the pins used to toogle the leds have a look at the LEDS-table at the beginning of *init.lua*.
+By default pins 7, 6 and 5 are used for red, yellow and green light.
+
+There is also a BUTTONPIN variable (default is 3) defining a pin which is connect to GND via a push button (internal pullup is used).

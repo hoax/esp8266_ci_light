@@ -51,12 +51,12 @@ For custom animations or static lighting open path **/light** + what you want it
 
 Lets assume that you request these URLs one after another:
 
-  * **http://ipOfYourEsp/light/red/0/yellow/0/green/0** turns the light on.
-  * **http://ipOfYourEsp/light/red/512** turns on red with 50% brightness (half of 1024)
-  * **http://ipOfYourEsp/light/green/1023** also turns on green with 100% brightness. (Red is still on at 50%!)
-  * **http://ipOfYourEsp/light/repeat/green/0/delay/500/green/1023/delay/500** lets blink green with 1 Hz. (turn off, wait 500ms, turn 100% on, wait 500ms, repeat)
-  * **http://ipOfYourEsp/light/green/0** stops the fade and turns green off. (And red is still on at 50%)
-  * **http://ipOfYourEsp/light/fade/red/10/0/1023/10** fades red from completely off to completely on within about 1s
-  * **http://ipOfYourEsp/light/fade/red/10/0/1023/10/delay/1000/fade/red/10/1023/0/10** fade red from off to on for one second, then fade back to off
+  * http://ipOfYourEsp**/light/red/0/yellow/0/green/0** turns the light on.
+  * http://ipOfYourEsp**/light/red/512** turns on red with 50% brightness (half of 1024)
+  * http://ipOfYourEsp**/light/green/1023** also turns on green with 100% brightness. (Red is still on at 50%!)
+  * http://ipOfYourEsp**/light/repeat/green/0/delay/500/green/1023/delay/500** lets blink green with 1 Hz. (turn off, wait 500ms, turn 100% on, wait 500ms, repeat)
+  * http://ipOfYourEsp**/light/green/0** stops the fade and turns green off. (And red is still on at 50%)
+  * http://ipOfYourEsp**/light/fade/red/10/0/1023/10** fades red from completely off to completely on within about 1s
+  * http://ipOfYourEsp**/light/fade/red/10/0/1023/10/delay/1000/fade/red/10/1023/0/10** fade red from off to on for one second, then fade back to off
   
 Too long URLs sometimes lead to a crash because there is no memory left!
